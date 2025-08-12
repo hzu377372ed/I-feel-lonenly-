@@ -1,52 +1,27 @@
-// main.ts - V2Ray Deno server
-
-import { startV2Ray } from "https://deno.land/x/v2ray_deno/mod.ts";
-
-await startV2Ray({
-  log: {
-    loglevel: "info",
-  },
-  inbounds: [
-    {
-      port: 8080, // المنفذ المحلي اللي رح تتصل منه
-      listen: "0.0.0.0",
-      protocol: "socks",
-      settings: {
-        udp: true,
-      },
-    },
-  ],
-  outbounds: [
-    {
-      protocol: "vmess",
-      settings: {
-        vnext: [
-          {
-            address: "377dc0dd-sva740-tbrhck-1thqb.hk.p5pv.com", // Host
-            port: 80,
-            users: [
-              {
-                id: "4f4c6876-fcf6-11ef-94aa-f23c913c8d2b", // UUID
-                alterId: 2,
-                security: "auto",
-              },
-            ],
-          },
-        ],
-      },
-      streamSettings: {
-        network: "ws",
-        wsSettings: {
-          path: "/",
-          headers: {
-            Host: "377dc0dd-sva740-tbrhck-1thqb.hk.p5pv.com",
-          },
-        },
-        tlsSettings: {
-          serverName: "broadcastlv.chat.bilibili.com", // SNI
-        },
-        security: "",
-      },
-    },
-  ],
+addEventListener("fetch", event => {
+  event.respondWith(handleRequest(event.request));
 });
+
+async function handleRequest(req: Request) {
+  const upgrade = req.headers.get("upgrade") || "";
+  if (upgrade.toLowerCase() !== "websocket") {
+    return new Response("Only WebSocket connections are supported", { status: 400 });
+  }
+
+  const { socket, response } = Deno.upgradeWebSocket(req);
+
+  const target = new WebSocket("ws://377dc0dd-sva740-tbrhck-1thqb.hk.p5pv.com:80/", [
+    "vmess"
+  ]);
+
+  socket.onmessage = msg => target.send(msg.data);
+  target.onmessage = msg => socket.send(msg.data);
+
+  socket.onclose = () => target.close();
+  target.onclose = () => socket.close();
+
+  socket.onerror = () => target.close();
+  target.onerror = () => socket.close();
+
+  return response;
+}
