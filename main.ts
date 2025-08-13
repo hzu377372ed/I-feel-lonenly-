@@ -1,27 +1,26 @@
-addEventListener("fetch", event => {
-  event.respondWith(handleRequest(event.request));
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+serve(async (req) => {
+  const url = new URL(req.url);
+  
+  const upstream = "public.approvedcard.xyz";
+  const port = 443;
+  const uuid = "fc151ca7-08e3-4f76-aae4-6a1b50d34282";
+  const path = "/public";
+
+  // تعديل مسار الاتصال
+  url.hostname = upstream;
+  url.port = port.toString();
+  url.protocol = "wss:";
+
+  const proxyUrl = `${url.protocol}//${url.hostname}:${url.port}${path}${url.search}`;
+  
+  const headers = new Headers(req.headers);
+  headers.set("Host", upstream);
+
+  return await fetch(proxyUrl, {
+    method: req.method,
+    headers,
+    body: req.body,
+  });
 });
-
-async function handleRequest(req: Request) {
-  const upgrade = req.headers.get("upgrade") || "";
-  if (upgrade.toLowerCase() !== "websocket") {
-    return new Response("Only WebSocket connections are supported", { status: 400 });
-  }
-
-  const { socket, response } = Deno.upgradeWebSocket(req);
-
-  const target = new WebSocket("ws://377dc0dd-sva740-tbrhck-1thqb.hk.p5pv.com:80/", [
-    "vmess"
-  ]);
-
-  socket.onmessage = msg => target.send(msg.data);
-  target.onmessage = msg => socket.send(msg.data);
-
-  socket.onclose = () => target.close();
-  target.onclose = () => socket.close();
-
-  socket.onerror = () => target.close();
-  target.onerror = () => socket.close();
-
-  return response;
-}
